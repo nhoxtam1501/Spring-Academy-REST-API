@@ -1,29 +1,29 @@
 package example.cashcard;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.util.Optional;
-
+import java.util.*;
 
 @RestController
 @RequestMapping("/cashcards")
 class CashCardController {
-
     private final CashCardRepository cashCardRepository;
 
     private CashCardController(CashCardRepository cashCardRepository) {
         this.cashCardRepository = cashCardRepository;
     }
 
-    /* @PathVariable makes Spring Web aware of the requestedId supplied in the HTTP request.
-        Now it’s available for us to use in our handler method.*/
-    @GetMapping("{id}")
-    private ResponseEntity<CashCard> findById(@PathVariable Long id) {
-        Optional<CashCard> cashCardOptional = cashCardRepository.findById(id);
-
+    @GetMapping("/{requestedId}")
+    private ResponseEntity<CashCard> findById(@PathVariable Long requestedId) {
+        Optional<CashCard> cashCardOptional = cashCardRepository.findById(requestedId);
         if (cashCardOptional.isPresent()) {
             return ResponseEntity.ok(cashCardOptional.get());
         } else {
@@ -31,18 +31,30 @@ class CashCardController {
         }
     }
 
-    @PostMapping                /*The POST expects a request "body". This contains the data submitted to the API.
-                                  Spring Web will deserialize the data into a CashCard for us.*/
-//  UriComponentsBuilder is injected by IoC Container
+    @PostMapping
     private ResponseEntity<Void> createCashCard(@RequestBody CashCard newCashCardRequest, UriComponentsBuilder ucb) {
         CashCard savedCashCard = cashCardRepository.save(newCashCardRequest);
-
-        /*This is constructing a URI to the newly created CashCard.
-         This is the URI that the caller can then use to GET the newly-created CashCard*/
-        URI locationOfNewCashCard = ucb.path("cashcards/{id}").buildAndExpand(savedCashCard.id()).toUri();
-
+        URI locationOfNewCashCard = ucb
+                .path("cashcards/{id}")
+                .buildAndExpand(savedCashCard.id())
+                .toUri();
         return ResponseEntity.created(locationOfNewCashCard).build();
+    }
 
+    @GetMapping
+    private ResponseEntity<Iterable<CashCard>> findAll(Pageable pageable) {
+    /*Pageable is yet another object that Spring Web provides for us.
+     Since we specified the URI parameters of page=0&size=1, pageable will contain the values we need.*/
+        Page<CashCard> page = cashCardRepository.findAll(
+                PageRequest.of(
+                        pageable.getPageNumber(),
+                        pageable.getPageSize(),
+                        pageable.getSortOr(Sort.by(Sort.Direction.ASC, "amount"))
+                        /*the getSortOr() method provides default values for the page, size, and sort parameters.
+                        * Spring provides default page and size values: 0, 20 */
+                        /*We defined the default sort parameter in our own code, by passing a Sort object to getSortOr()*/
+                ));
 
+        return ResponseEntity.ok(page.getContent());
     }
 }
