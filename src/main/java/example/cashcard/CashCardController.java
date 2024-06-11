@@ -10,7 +10,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.util.*;
+import java.security.Principal;
+import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/cashcards")
@@ -22,18 +24,19 @@ class CashCardController {
     }
 
     @GetMapping("/{requestedId}")
-    private ResponseEntity<CashCard> findById(@PathVariable Long requestedId) {
-        Optional<CashCard> cashCardOptional = cashCardRepository.findById(requestedId);
-        if (cashCardOptional.isPresent()) {
-            return ResponseEntity.ok(cashCardOptional.get());
+    private ResponseEntity<CashCard> findById(@PathVariable Long requestedId, Principal principal) {
+        CashCard cashCard = findCashCard(requestedId, principal);
+        if (cashCard != null) {
+            return ResponseEntity.ok(cashCard);
         } else {
             return ResponseEntity.notFound().build();
         }
     }
 
     @PostMapping
-    private ResponseEntity<Void> createCashCard(@RequestBody CashCard newCashCardRequest, UriComponentsBuilder ucb) {
-        CashCard savedCashCard = cashCardRepository.save(newCashCardRequest);
+    private ResponseEntity<Void> createCashCard(@RequestBody CashCard newCashCardRequest, UriComponentsBuilder ucb, Principal principal) {
+        CashCard cashCardWithOwner = new CashCard(null, newCashCardRequest.amount(), principal.getName());
+        CashCard savedCashCard = cashCardRepository.save(cashCardWithOwner);
         URI locationOfNewCashCard = ucb
                 .path("cashcards/{id}")
                 .buildAndExpand(savedCashCard.id())
@@ -42,19 +45,31 @@ class CashCardController {
     }
 
     @GetMapping
-    private ResponseEntity<Iterable<CashCard>> findAll(Pageable pageable) {
-    /*Pageable is yet another object that Spring Web provides for us.
-     Since we specified the URI parameters of page=0&size=1, pageable will contain the values we need.*/
-        Page<CashCard> page = cashCardRepository.findAll(
+    private ResponseEntity<List<CashCard>> findAll(Pageable pageable, Principal principal) {
+        Page<CashCard> page = cashCardRepository.findByOwner(principal.getName(),
                 PageRequest.of(
                         pageable.getPageNumber(),
                         pageable.getPageSize(),
                         pageable.getSortOr(Sort.by(Sort.Direction.ASC, "amount"))
-                        /*the getSortOr() method provides default values for the page, size, and sort parameters.
-                        * Spring provides default page and size values: 0, 20 */
-                        /*We defined the default sort parameter in our own code, by passing a Sort object to getSortOr()*/
                 ));
-
         return ResponseEntity.ok(page.getContent());
+    }
+
+    @PutMapping("{requestId}")
+    private ResponseEntity<Void> putCashCard(@PathVariable Long requestId, @RequestBody CashCard cashCardDto, Principal principal) {
+        CashCard oldCashCard = findCashCard(requestId, principal);
+
+        if(oldCashCard != null) {
+            CashCard updatedCashCard = new CashCard(oldCashCard.id(), cashCardDto.amount(), principal.getName());
+            cashCardRepository.save(updatedCashCard);
+            return ResponseEntity.noContent().build();
+        }
+
+        return ResponseEntity.notFound().build();
+
+    }
+
+    private CashCard findCashCard(Long id, Principal principal) {
+        return cashCardRepository.findByIdAndOwner(id, principal.getName());
     }
 }
