@@ -7,11 +7,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpMethod;
+
 import java.net.URI;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -161,33 +162,75 @@ class CashCardApplicationTests {
 	@Test
 	@DirtiesContext
 	void shouldUpdateAnExistingCashCard() {
-		CashCard updatedCashCard = new CashCard(null, 19.99, null);
-		HttpEntity<CashCard> request = new HttpEntity<>(updatedCashCard);
-		ResponseEntity<Void> response = restTemplate.withBasicAuth("sarah1", "abc123")
+		CashCard cashCardUpdate = new CashCard(null, 19.99, null);
+		HttpEntity<CashCard> request = new HttpEntity<>(cashCardUpdate);
+		ResponseEntity<Void> response = restTemplate
+				.withBasicAuth("sarah1", "abc123")
 				.exchange("/cashcards/99", HttpMethod.PUT, request, Void.class);
-
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
-		ResponseEntity<String> getResponse = restTemplate.withBasicAuth("sarah1", "abc123").getForEntity("/cashcards/99", String.class);
-
+		ResponseEntity<String> getResponse = restTemplate
+				.withBasicAuth("sarah1", "abc123")
+				.getForEntity("/cashcards/99", String.class);
 		assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 		DocumentContext documentContext = JsonPath.parse(getResponse.getBody());
 		Number id = documentContext.read("$.id");
 		Double amount = documentContext.read("$.amount");
-
 		assertThat(id).isEqualTo(99);
 		assertThat(amount).isEqualTo(19.99);
 	}
 
 	@Test
-	void shouldNotUpdateACashCardThatIsOwnedBySomeoneElse() {
-		CashCard  kumarsCard = new CashCard(null, 333.33, null);
-
-		HttpEntity<CashCard> request = new HttpEntity<>(kumarsCard);
-		ResponseEntity<Void> response = restTemplate.withBasicAuth("sarah1", "abc123").exchange(
-				"/cashcards/102", HttpMethod.PUT, request, Void.class);
-
+	void shouldNotUpdateACashCardThatDoesNotExist() {
+		CashCard unknownCard = new CashCard(null, 19.99, null);
+		HttpEntity<CashCard> request = new HttpEntity<>(unknownCard);
+		ResponseEntity<Void> response = restTemplate
+				.withBasicAuth("sarah1", "abc123")
+				.exchange("/cashcards/99999", HttpMethod.PUT, request, Void.class);
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	void shouldNotUpdateACashCardThatIsOwnedBySomeoneElse() {
+		CashCard kumarsCard = new CashCard(null, 333.33, null);
+		HttpEntity<CashCard> request = new HttpEntity<>(kumarsCard);
+		ResponseEntity<Void> response = restTemplate
+				.withBasicAuth("sarah1", "abc123")
+				.exchange("/cashcards/102", HttpMethod.PUT, request, Void.class);
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	@DirtiesContext
+	void shouldDeleteAnExistingCashCard() {
+		ResponseEntity<Void> response = restTemplate.withBasicAuth("sarah1", "abc123")
+				.exchange("/cashcards/99",HttpMethod.DELETE, null, Void.class);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+	}
+
+	@Test
+	void shouldNotDeleteACashCardThatDoesNotExist() {
+		ResponseEntity<Void> deleteRepsonse = restTemplate.withBasicAuth("sarah1", "abc123")
+				.exchange("/cashcards/9999999", HttpMethod.DELETE, null, Void.class);
+
+		assertThat(deleteRepsonse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	void shouldNotAllowDeleteionOfCashCardsTheyDoNotOwn() {
+		ResponseEntity<Void> deleteResponse = restTemplate.withBasicAuth("sarah1", "abc123")
+				.exchange("/cashcards/102", HttpMethod.DELETE, null, Void.class);
+
+		assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	void shouldNotAllowDeletetionOfCashCardsTheyDoNotOwn() {
+		ResponseEntity<String> getResponse = restTemplate.withBasicAuth("kumar2", "xyz789")
+				.getForEntity("/cashcards/102", String.class);
+
+		assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 	}
 
 }

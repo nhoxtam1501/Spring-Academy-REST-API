@@ -4,7 +4,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -12,7 +11,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.net.URI;
 import java.security.Principal;
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/cashcards")
@@ -55,21 +53,30 @@ class CashCardController {
         return ResponseEntity.ok(page.getContent());
     }
 
-    @PutMapping("{requestId}")
-    private ResponseEntity<Void> putCashCard(@PathVariable Long requestId, @RequestBody CashCard cashCardDto, Principal principal) {
-        CashCard oldCashCard = findCashCard(requestId, principal);
-
-        if(oldCashCard != null) {
-            CashCard updatedCashCard = new CashCard(oldCashCard.id(), cashCardDto.amount(), principal.getName());
+    @PutMapping("/{requestedId}")
+    private ResponseEntity<Void> putCashCard(@PathVariable Long requestedId, @RequestBody CashCard cashCardUpdate, Principal principal) {
+        CashCard cashCard = findCashCard(requestedId, principal);
+        if (cashCard != null) {
+            CashCard updatedCashCard = new CashCard(requestedId, cashCardUpdate.amount(), principal.getName());
             cashCardRepository.save(updatedCashCard);
             return ResponseEntity.noContent().build();
         }
-
         return ResponseEntity.notFound().build();
-
     }
 
-    private CashCard findCashCard(Long id, Principal principal) {
-        return cashCardRepository.findByIdAndOwner(id, principal.getName());
+    @DeleteMapping({"/{id}"})
+    private ResponseEntity<Void> deleteCashCard(@PathVariable Long id, Principal principal) {
+
+        if(cashCardRepository.existsByIdAndOwner(id, principal.getName())) {
+            cashCardRepository.deleteById(id);
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+
+    private CashCard findCashCard(Long requestedId, Principal principal) {
+
+        return cashCardRepository.findByIdAndOwner(requestedId, principal.getName());
     }
 }
