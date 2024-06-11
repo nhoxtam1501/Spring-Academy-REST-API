@@ -42,6 +42,8 @@ class CashCardController {
         return ResponseEntity.created(locationOfNewCashCard).build();
     }
 
+    /*url: http:localhost/cashcards?page=1&size=3&sort=amount,desc*/
+    /* If the caller doesn’t provide the parameters, Spring provides defaults: page=0, size=20.*/
     @GetMapping
     private ResponseEntity<List<CashCard>> findAll(Pageable pageable, Principal principal) {
         Page<CashCard> page = cashCardRepository.findByOwner(principal.getName(),
@@ -55,8 +57,7 @@ class CashCardController {
 
     @PutMapping("/{requestedId}")
     private ResponseEntity<Void> putCashCard(@PathVariable Long requestedId, @RequestBody CashCard cashCardUpdate, Principal principal) {
-        CashCard cashCard = findCashCard(requestedId, principal);
-        if (cashCard != null) {
+        if (findCashCard(requestedId, principal) != null) {
             CashCard updatedCashCard = new CashCard(requestedId, cashCardUpdate.amount(), principal.getName());
             cashCardRepository.save(updatedCashCard);
             return ResponseEntity.noContent().build();
